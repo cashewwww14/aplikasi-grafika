@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Floor Socket 3D - Computer Graphics</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .main-header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .main-header h1 {
+            font-size: 2.5rem;
+            font-weight: 300;
+            margin-bottom: 10px;
+        }
+
+        .main-header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 30px;
+            align-items: start;
+        }
+
+        .canvas-container {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            border: 3px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        #gl-canvas {
+            display: block;
+            background: #f8fafc;
+        }
+
+        .controls {
+            width: 320px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            height: 640px; /* Same height as canvas (600px) + padding (40px) */
+            overflow-y: auto;
+        }
+
+        .controls::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .controls::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 3px;
+        }
+
+        .controls::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: rgba(248,250,252,0.8);
+            border-radius: 12px;
+            border: 1px solid rgba(226,232,240,0.5);
+        }
+
+        .control-group h3 {
+            margin: 0 0 15px 0;
+            color: #1e293b;
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-group h3:before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 2px;
+        }
+
+        label {
+            display: block;
+            margin: 8px 0 4px 0;
+            font-size: 13px;
+            font-weight: 500;
+            color: #475569;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            margin: 8px 0 12px 0;
+            background: #e2e8f0;
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px 16px;
+            margin: 6px 0;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.active {
+            background: linear-gradient(45deg, #10b981, #059669);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        button.secondary {
+            background: linear-gradient(45deg, #64748b, #475569);
+            box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
+        }
+
+        .info {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            font-size: 13px;
+            line-height: 1.5;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .info strong {
+            color: #92400e;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .rotation-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .rotation-buttons button {
+            padding: 10px 8px;
+            font-size: 12px;
+            margin: 0;
+        }
+
+        .value-display {
+            display: inline-block;
+            min-width: 40px;
+            text-align: right;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        /* New bottom section styles */
+        .bottom-section {
+            max-width: 1400px;
+            margin: 30px auto 0;
+        }
+
+        .combined-info {
+            background: rgba(255,255,255,0.95);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+
+        .info-left h3, .info-right h3 {
+            margin-bottom: 15px;
+            color: #1e293b;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .info-left {
+            text-align: center;
+        }
+
+        .info-left p {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .info-left .name {
+            color: #1e293b;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .info-right h3 {
+            text-align: center;
+        }
+
+        .reference-photos {
+            background: rgba(248,250,252,0.8);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(226,232,240,0.5);
+        }
+
+        .reference-photos p {
+            margin-bottom: 15px;
+            font-style: italic;
+            color: #64748b;
+            text-align: center;
+        }
+
+        .photo-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 10px 0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .photo-placeholder img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            display: block;
+        }
+
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .controls {
+                width: 100%;
+                max-width: 800px;
+                margin: 0 auto;
+                height: auto;
+            }
+
+            .combined-info {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .main-header h1 {
+                font-size: 2rem;
+            }
+            
+            .canvas-container {
+                padding: 15px;
+            }
+            
+            #gl-canvas {
+                max-width: 100%;
+                height: auto;
+            }
+            
+            .controls {
+                padding: 20px;
+            }
+
+            .combined-info {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- WebGL Shaders -->
+    <script id="vertex-shader" type="x-shader/x-vertex">
+        attribute vec4 vPosition;
+        attribute vec4 vColor;
+        
+        uniform mat4 modelViewMatrix;
+        uniform mat4 projectionMatrix;
+        
+        varying vec4 fColor;
+        
+        void main() {
+            fColor = vColor;
+            gl_Position = projectionMatrix * modelViewMatrix * vPosition;
+        }
+    </script>
+
+    <script id="fragment-shader" type="x-shader/x-fragment">
+        precision mediump float;
+        
+        varying vec4 fColor;
+        
+        void main() {
+            gl_FragColor = fColor;
+        }
+    </script>
+
+    <div class="main-header">
+        <h1>Floor Socket 3D Model</h1>
+        <p>Interactive Computer Graphics Application</p>
+    </div>
+    
+    <div class="container">
+        <div class="canvas-container">
+            <div class="canvas-wrapper">
+                <canvas id="gl-canvas" width="800" height="600">
+                    Your browser does not support WebGL
+                </canvas>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="info">
+                <strong>🎮 Interactive Controls</strong>
+                • Left Click + Drag: Rotate Camera<br>
+                • Mouse Wheel: Zoom In/Out<br>
+                • Right Click + Drag: Pan View
+            </div>
+            
+            <div class="control-group">
+                <h3>Socket Animation</h3>
+                <label>Cover Angle: <span id="coverAngle-value" class="value-display">0°</span></label>
+                <input type="range" id="coverAngle" min="0" max="90" step="1" value="0">
+                <div class="rotation-buttons">
+                    <button id="openBtn" onclick="openSocket()">Open</button>
+                    <button id="closeBtn" onclick="closeSocket()">Close</button>
+                    <button class="secondary" onclick="resetAnimation()">Reset</button>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <h3>Animated Rotation</h3>
+                <div class="rotation-buttons">
+                    <button onclick="animateRotationX()">Rotate X</button>
+                    <button onclick="animateRotationY()">Rotate Y</button>
+                    <button onclick="animateRotationZ()">Rotate Z</button>
+                </div>
+                <button class="secondary" onclick="stopRotation()">Stop Rotation</button>
+            </div>
+            
+            <div class="control-group">
+                <h3>Scale Transform</h3>
+                <label>Scale X: <span id="scaleX-value" class="value-display">1.0</span></label>
+                <input type="range" id="scaleX" min="0.5" max="2.0" step="0.1" value="1.0">
+                
+                <label>Scale Y: <span id="scaleY-value" class="value-display">1.0</span></label>
+                <input type="range" id="scaleY" min="0.5" max="2.0" step="0.1" value="1.0">
+                
+                <label>Scale Z: <span id="scaleZ-value" class="value-display">1.0</span></label>
+                <input type="range" id="scaleZ" min="0.5" max="2.0" step="0.1" value="1.0">
+                
+                <button class="secondary" onclick="resetTransform()">Reset Transform</button>
+            </div>
+            
+            <div class="control-group">
+                <h3>Object Rotation</h3>
+                <label>Rotation X: <span id="rotX-value" class="value-display">0°</span></label>
+                <input type="range" id="rotX" min="-180" max="180" step="5" value="0">
+                
+                <label>Rotation Y: <span id="rotY-value" class="value-display">0°</span></label>
+                <input type="range" id="rotY" min="-180" max="180" step="5" value="0">
+                
+                <label>Rotation Z: <span id="rotZ-value" class="value-display">0°</span></label>
+                <input type="range" id="rotZ" min="-180" max="180" step="5" value="0">
+            </div>
+            
+            <div class="control-group">
+                <h3>Visual Options</h3>
+                <div class="rotation-buttons">
+                    <button class="secondary" onclick="toggleGrid()">Toggle Grid</button>
+                    <button class="secondary" onclick="toggleWireframe()">Wireframe</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Bottom Section -->
+    <div class="bottom-section">
+        <div class="combined-info">
+            <div class="info-left info">
+                <h3>👨‍💻 Developer Information</h3>
+                <p class="name">5025231229 - Ahmad Zaky Ash Shidqi</p>
+                <p class="name">5025231213 - Rafif Thariq Dhiyaulhaqi</p>
+                <p>Informatics Engineering Department</p>
+                <p>Interactive Computer Graphics Project</p>
+                <p style="margin-top: 15px; font-size: 13px; color: #94a3b8;">
+                    Created with WebGL and JavaScript
+                </p>
+            </div>
+            
+            <div class="info-right">
+                <h3>📷 Reference Photos</h3>
+                <div class="reference-photos">
+                    <p>Floor Socket at IF-107 Informatics Engineering Department</p>
+                    <div class="photo-placeholder">
+                        <img src="foto.jpg" alt="Foto Asli">
+                    </div>
+                    <div class="photo-placeholder">
+                        <img src="cropfoto.jpg" alt="Foto Crop">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="initShaders.js"></script>
+    <script src="MVnew.js"></script>
+    <script src="floor-socket.js"></script>
+</body>
+</html>
