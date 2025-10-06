@@ -63,7 +63,7 @@
 
         #gl-canvas {
             display: block;
-            background: #f8fafc;
+            background: #1a1a1a;
         }
 
         .controls {
@@ -74,7 +74,7 @@
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255,255,255,0.2);
-            height: 640px; /* Same height as canvas (600px) + padding (40px) */
+            max-height: 640px;
             overflow-y: auto;
         }
 
@@ -157,6 +157,15 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.2);
         }
 
+        input[type="color"] {
+            width: 100%;
+            height: 40px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            padding: 2px;
+        }
+
         button {
             width: 100%;
             padding: 12px 16px;
@@ -228,7 +237,16 @@
             color: #1e293b;
         }
 
-        /* New bottom section styles */
+        .color-preview {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 2px solid #e2e8f0;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+
         .bottom-section {
             max-width: 1400px;
             margin: 30px auto 0;
@@ -315,7 +333,7 @@
                 width: 100%;
                 max-width: 800px;
                 margin: 0 auto;
-                height: auto;
+                max-height: none;
             }
 
             .combined-info {
@@ -353,19 +371,25 @@
     </style>
 </head>
 <body>
-    <!-- WebGL Shaders -->
     <script id="vertex-shader" type="x-shader/x-vertex">
         attribute vec4 vPosition;
         attribute vec4 vColor;
+        attribute vec3 vNormal;
         
         uniform mat4 modelViewMatrix;
         uniform mat4 projectionMatrix;
+        uniform mat3 normalMatrix;
         
         varying vec4 fColor;
+        varying vec3 fNormal;
+        varying vec3 fPosition;
         
         void main() {
+            vec4 pos = modelViewMatrix * vPosition;
+            fPosition = pos.xyz;
+            fNormal = normalize(normalMatrix * vNormal);
             fColor = vColor;
-            gl_Position = projectionMatrix * modelViewMatrix * vPosition;
+            gl_Position = projectionMatrix * pos;
         }
     </script>
 
@@ -373,15 +397,47 @@
         precision mediump float;
         
         varying vec4 fColor;
+        varying vec3 fNormal;
+        varying vec3 fPosition;
+        
+        uniform vec3 ambientLight;
+        uniform vec3 diffuseLight;
+        uniform vec3 specularLight;
+        uniform vec3 lightPosition;
+        uniform float shininess;
+        uniform bool enableLighting;
         
         void main() {
-            gl_FragColor = fColor;
+            if (!enableLighting) {
+                gl_FragColor = fColor;
+                return;
+            }
+            
+            vec3 N = normalize(fNormal);
+            vec3 L = normalize(lightPosition - fPosition);
+            vec3 E = normalize(-fPosition);
+            vec3 H = normalize(L + E);
+            
+            vec3 ambient = ambientLight * fColor.rgb;
+            
+            float diffuseFactor = max(dot(N, L), 0.0);
+            vec3 diffuse = diffuseFactor * diffuseLight * fColor.rgb;
+            
+            float specularFactor = pow(max(dot(N, H), 0.0), shininess);
+            vec3 specular = specularFactor * specularLight;
+            
+            if (dot(N, L) < 0.0) {
+                specular = vec3(0.0, 0.0, 0.0);
+            }
+            
+            vec3 finalColor = ambient + diffuse + specular;
+            gl_FragColor = vec4(finalColor, fColor.a);
         }
     </script>
 
     <div class="main-header">
         <h1>Floor Socket 3D Model</h1>
-        <p>Interactive Computer Graphics Application</p>
+        <p>Interactive Computer Graphics Application with Lighting</p>
     </div>
     
     <div class="container">
@@ -395,10 +451,41 @@
         
         <div class="controls">
             <div class="info">
-                <strong>🎮 Interactive Controls</strong>
-                • Left Click + Drag: Rotate Camera<br>
-                • Mouse Wheel: Zoom In/Out<br>
-                • Right Click + Drag: Pan View
+                <strong>Interactive Controls</strong>
+                Left Click + Drag: Rotate Camera<br>
+                Mouse Wheel: Zoom In/Out<br>
+                Right Click + Drag: Pan View
+            </div>
+
+            <div class="control-group">
+                <h3>Lighting Controls</h3>
+                <button id="toggleLighting" class="active" onclick="toggleLighting()">Lighting: ON</button>
+                
+                <label>Ambient Color <span class="color-preview" id="ambientPreview"></span></label>
+                <input type="color" id="ambientColor" value="#333333">
+                
+                <label>Diffuse Color <span class="color-preview" id="diffusePreview"></span></label>
+                <input type="color" id="diffuseColor" value="#ffffff">
+                
+                <label>Specular Color <span class="color-preview" id="specularPreview"></span></label>
+                <input type="color" id="specularColor" value="#ffffff">
+                
+                <label>Shininess: <span id="shininess-value" class="value-display">50</span></label>
+                <input type="range" id="shininess" min="1" max="200" step="1" value="50">
+            </div>
+
+            <div class="control-group">
+                <h3>Light Position</h3>
+                <label>Light X: <span id="lightX-value" class="value-display">2.0</span></label>
+                <input type="range" id="lightX" min="-10" max="10" step="0.5" value="2">
+                
+                <label>Light Y: <span id="lightY-value" class="value-display">3.0</span></label>
+                <input type="range" id="lightY" min="-10" max="10" step="0.5" value="3">
+                
+                <label>Light Z: <span id="lightZ-value" class="value-display">2.0</span></label>
+                <input type="range" id="lightZ" min="-10" max="10" step="0.5" value="2">
+                
+                <button class="secondary" onclick="resetLighting()">Reset Lighting</button>
             </div>
             
             <div class="control-group">
@@ -453,16 +540,16 @@
                 <div class="rotation-buttons">
                     <button class="secondary" onclick="toggleGrid()">Toggle Grid</button>
                     <button class="secondary" onclick="toggleWireframe()">Wireframe</button>
+                    <button class="secondary" onclick="toggleProjection()">Orthographic</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- New Bottom Section -->
     <div class="bottom-section">
         <div class="combined-info">
             <div class="info-left info">
-                <h3>👨‍💻 Developer Information</h3>
+                <h3>Developer Information</h3>
                 <p class="name">5025231229 - Ahmad Zaky Ash Shidqi</p>
                 <p class="name">5025231213 - Rafif Thariq Dhiyaulhaqi</p>
                 <p>Informatics Engineering Department</p>
@@ -473,7 +560,7 @@
             </div>
             
             <div class="info-right">
-                <h3>📷 Reference Photos</h3>
+                <h3>Reference Photos</h3>
                 <div class="reference-photos">
                     <p>Floor Socket at IF-107 Informatics Engineering Department</p>
                     <div class="photo-placeholder">
