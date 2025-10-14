@@ -375,6 +375,7 @@
         attribute vec4 vPosition;
         attribute vec4 vColor;
         attribute vec3 vNormal;
+        attribute vec2 vTexCoord;
         
         uniform mat4 modelViewMatrix;
         uniform mat4 projectionMatrix;
@@ -383,12 +384,14 @@
         varying vec4 fColor;
         varying vec3 fNormal;
         varying vec3 fPosition;
+        varying vec2 fTexCoord;
         
         void main() {
             vec4 pos = modelViewMatrix * vPosition;
             fPosition = pos.xyz;
             fNormal = normalize(normalMatrix * vNormal);
             fColor = vColor;
+            fTexCoord = vTexCoord;
             gl_Position = projectionMatrix * pos;
         }
     </script>
@@ -399,6 +402,7 @@
         varying vec4 fColor;
         varying vec3 fNormal;
         varying vec3 fPosition;
+        varying vec2 fTexCoord;
         
         uniform vec3 ambientLight;
         uniform vec3 diffuseLight;
@@ -407,9 +411,28 @@
         uniform float shininess;
         uniform bool enableLighting;
         
+        uniform sampler2D uTexture;
+        uniform int textureMode;  // 0 = none, 1 = checkerboard, 2 = image
+        uniform bool useTexture;
+        
         void main() {
+            vec4 baseColor = fColor;
+            
+            // Apply texture if enabled
+            if (useTexture && textureMode > 0) {
+                vec4 texColor = texture2D(uTexture, fTexCoord);
+                // Use multiplicative blending for better contrast
+                if (textureMode == 1) {
+                    // Checkerboard: multiply for better contrast on light surfaces
+                    baseColor = vec4(fColor.rgb * texColor.rgb * 1.5, fColor.a);
+                } else {
+                    // Image texture: use mix blending
+                    baseColor = mix(fColor, texColor, 0.7);
+                }
+            }
+            
             if (!enableLighting) {
-                gl_FragColor = fColor;
+                gl_FragColor = baseColor;
                 return;
             }
             
@@ -418,10 +441,10 @@
             vec3 E = normalize(-fPosition);
             vec3 H = normalize(L + E);
             
-            vec3 ambient = ambientLight * fColor.rgb;
+            vec3 ambient = ambientLight * baseColor.rgb;
             
             float diffuseFactor = max(dot(N, L), 0.0);
-            vec3 diffuse = diffuseFactor * diffuseLight * fColor.rgb;
+            vec3 diffuse = diffuseFactor * diffuseLight * baseColor.rgb;
             
             float specularFactor = pow(max(dot(N, H), 0.0), shininess);
             vec3 specular = specularFactor * specularLight;
@@ -431,7 +454,7 @@
             }
             
             vec3 finalColor = ambient + diffuse + specular;
-            gl_FragColor = vec4(finalColor, fColor.a);
+            gl_FragColor = vec4(finalColor, baseColor.a);
         }
     </script>
 
@@ -542,6 +565,21 @@
                     <button class="secondary" onclick="toggleWireframe()">Wireframe</button>
                     <button class="secondary" onclick="toggleProjection()">Orthographic</button>
                 </div>
+            </div>
+            
+            <div class="control-group">
+                <h3>Texture Settings</h3>
+                <label>Texture Mode:</label>
+                <select id="textureMode" onchange="changeTextureMode()">
+                    <option value="0">No Texture</option>
+                    <option value="1" selected>Checkerboard</option>
+                    <option value="2">Image Texture</option>
+                </select>
+                
+                <label style="margin-top: 15px;">Upload Custom Texture:</label>
+                <input type="file" id="textureUpload" accept="image/*" onchange="loadCustomTexture(event)">
+                
+                <button class="secondary" onclick="toggleTexture()" id="toggleTextureBtn" style="margin-top: 10px;">Texture: ON</button>
             </div>
         </div>
     </div>

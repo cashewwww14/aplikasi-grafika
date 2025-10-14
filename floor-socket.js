@@ -2,7 +2,7 @@ var canvas;
 var gl;
 var program;
 
-var vBuffer, cBuffer, nBuffer, iBuffer;
+var vBuffer, cBuffer, nBuffer, iBuffer, tBuffer;
 var modelViewMatrixLoc, projectionMatrixLoc, normalMatrixLoc;
 var modelViewMatrix = mat4();
 var projectionMatrix;
@@ -38,10 +38,19 @@ var vertices = [];
 var colors = [];
 var normals = [];
 var indices = [];
+var texCoords = [];
 
 var COVER_MAX_ANGLE = 85;
 
 var orthographic = false;
+
+// Texture variables
+var checkerboardTexture;
+var imageTexture;
+var currentTexture;
+var textureMode = 1; // 0 = none, 1 = checkerboard, 2 = image
+var useTexture = true;
+var textureLoc, textureModeLoc, useTextureLoc;
 
 // Lighting variables
 var lightingEnabled = true;
@@ -88,8 +97,16 @@ window.onload = function init() {
     lightPositionLoc = gl.getUniformLocation(program, "lightPosition");
     shininessLoc = gl.getUniformLocation(program, "shininess");
     enableLightingLoc = gl.getUniformLocation(program, "enableLighting");
+    
+    // Get texture uniform locations
+    textureLoc = gl.getUniformLocation(program, "uTexture");
+    textureModeLoc = gl.getUniformLocation(program, "textureMode");
+    useTextureLoc = gl.getUniformLocation(program, "useTexture");
 
     updateProjectionMatrix();
+    
+    // Initialize textures
+    initTextures();
 
     setupEventListeners();
     setupControlListeners();
@@ -97,6 +114,139 @@ window.onload = function init() {
 
     render();
 };
+
+function initTextures() {
+    // Create checkerboard texture
+    checkerboardTexture = createCheckerboardTexture();
+    
+    // Create default image texture (simple gradient)
+    imageTexture = createDefaultImageTexture();
+    
+    // Set current texture to checkerboard
+    currentTexture = checkerboardTexture;
+}
+
+function createCheckerboardTexture() {
+    var texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    
+    var size = 64;
+    var checkSize = 8;
+    var data = new Uint8Array(size * size * 4);
+    
+    for (var i = 0; i < size; i++) {
+        for (var j = 0; j < size; j++) {
+            var isWhite = ((Math.floor(i / checkSize) + Math.floor(j / checkSize)) % 2) === 0;
+            var idx = (i * size + j) * 4;
+            
+            if (isWhite) {
+                data[idx] = 255;     // R - Pure white
+                data[idx + 1] = 255; // G
+                data[idx + 2] = 255; // B
+            } else {
+                data[idx] = 20;      // R - Much darker black
+                data[idx + 1] = 20;  // G
+                data[idx + 2] = 20;  // B
+            }
+            data[idx + 3] = 255;     // A
+        }
+    }
+    
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    
+    return texture;
+}
+
+function createDefaultImageTexture() {
+    var texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    
+    var size = 64;
+    var data = new Uint8Array(size * size * 4);
+    
+    for (var i = 0; i < size; i++) {
+        for (var j = 0; j < size; j++) {
+            var idx = (i * size + j) * 4;
+            
+            // Create a gradient pattern
+            var r = Math.floor(255 * (i / size));
+            var g = Math.floor(255 * (j / size));
+            var b = 150;
+            
+            data[idx] = r;
+            data[idx + 1] = g;
+            data[idx + 2] = b;
+            data[idx + 3] = 255;
+        }
+    }
+    
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    
+    return texture;
+}
+
+function loadCustomTexture(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+            imageTexture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+            
+            // Check if image is power of 2
+            if (isPowerOf2(img.width) && isPowerOf2(img.height)) {
+                gl.generateMipmap(gl.TEXTURE_2D);
+            } else {
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            }
+            
+            // Switch to image texture mode
+            textureMode = 2;
+            document.getElementById("textureMode").value = "2";
+            currentTexture = imageTexture;
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function isPowerOf2(value) {
+    return (value & (value - 1)) === 0;
+}
+
+function changeTextureMode() {
+    textureMode = parseInt(document.getElementById("textureMode").value);
+    
+    if (textureMode === 1) {
+        currentTexture = checkerboardTexture;
+    } else if (textureMode === 2) {
+        currentTexture = imageTexture;
+    }
+}
+
+function toggleTexture() {
+    useTexture = !useTexture;
+    var btn = document.getElementById("toggleTextureBtn");
+    if (useTexture) {
+        btn.textContent = "Texture: ON";
+        btn.classList.add("active");
+    } else {
+        btn.textContent = "Texture: OFF";
+        btn.classList.remove("active");
+    }
+}
 
 function setupLightingListeners() {
     // Ambient color
@@ -212,6 +362,7 @@ function createFloorSocket() {
     colors = [];
     normals = [];
     indices = [];
+    texCoords = [];
     
     const baseColor = [0.75, 0.75, 0.78, 1.0];
     const recessColor = [0.4, 0.4, 0.4, 1.0];
@@ -248,6 +399,7 @@ function createFloorSocket() {
 
 function addBaseFrame(x, y, z, width, depth, height, bevel, color) {
     const startIndex = vertices.length;
+    let currentIdx = 0;
 
     const w2 = width / 2;
     const d2 = depth / 2;
@@ -255,42 +407,87 @@ function addBaseFrame(x, y, z, width, depth, height, bevel, color) {
     const bw = w2 - bevel;
     const bd = d2 - bevel;
 
-    const frameVertices = [
-        vec4(x - w2, y - h2, z + d2, 1.0),
-        vec4(x + w2, y - h2, z + d2, 1.0),
-        vec4(x + w2, y - h2, z - d2, 1.0),
-        vec4(x - w2, y - h2, z - d2, 1.0),
-        
-        vec4(x - bw, y + h2, z + bd, 1.0),
-        vec4(x + bw, y + h2, z + bd, 1.0),
-        vec4(x + bw, y + h2, z - bd, 1.0),
-        vec4(x - bw, y + h2, z - bd, 1.0),
-    ];
+    // Define corner vertices
+    const v_bfl = vec4(x - w2, y - h2, z + d2, 1.0);  // bottom-front-left
+    const v_bfr = vec4(x + w2, y - h2, z + d2, 1.0);  // bottom-front-right
+    const v_bbr = vec4(x + w2, y - h2, z - d2, 1.0);  // bottom-back-right
+    const v_bbl = vec4(x - w2, y - h2, z - d2, 1.0);  // bottom-back-left
+    
+    const v_tfl = vec4(x - bw, y + h2, z + bd, 1.0);  // top-front-left
+    const v_tfr = vec4(x + bw, y + h2, z + bd, 1.0);  // top-front-right
+    const v_tbr = vec4(x + bw, y + h2, z - bd, 1.0);  // top-back-right
+    const v_tbl = vec4(x - bw, y + h2, z - bd, 1.0);  // top-back-left
 
     const backColor = [0.6, 0.6, 0.65, 1.0];
     
-    for (let i = 0; i < frameVertices.length; i++) {
-        vertices.push(frameVertices[i]);
-        if (i === 2 || i === 3 || i === 6 || i === 7) {
-            colors.push(backColor);
-        } else {
-            colors.push(color);
-        }
+    // TOP FACE (inner rectangle)
+    vertices.push(v_tfl, v_tfr, v_tbr, v_tbl);
+    for(let i=0; i<4; i++) {
+        colors.push(color);
         normals.push(vec3(0, 1, 0));
     }
-
-    const frameIndices = [
-        4, 5, 6, 4, 6, 7,
-        0, 1, 5, 0, 5, 4,
-        1, 2, 6, 1, 6, 5,
-        2, 3, 7, 2, 7, 6,
-        3, 0, 4, 3, 4, 7,
-        0, 3, 2, 0, 2, 1
-    ];
-
-    for (let i = 0; i < frameIndices.length; i++) {
-        indices.push(startIndex + frameIndices[i]);
+    texCoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+    indices.push(startIndex + 0, startIndex + 1, startIndex + 2);
+    indices.push(startIndex + 0, startIndex + 2, startIndex + 3);
+    currentIdx += 4;
+    
+    // FRONT BEVEL (trapezoid)
+    vertices.push(v_bfl, v_bfr, v_tfr, v_tfl);
+    for(let i=0; i<4; i++) {
+        colors.push(color);
+        let norm = computeNormal(v_bfl, v_bfr, v_tfr);
+        normals.push(norm);
     }
+    texCoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+    indices.push(startIndex + currentIdx + 0, startIndex + currentIdx + 1, startIndex + currentIdx + 2);
+    indices.push(startIndex + currentIdx + 0, startIndex + currentIdx + 2, startIndex + currentIdx + 3);
+    currentIdx += 4;
+    
+    // RIGHT BEVEL (trapezoid)
+    vertices.push(v_bfr, v_bbr, v_tbr, v_tfr);
+    for(let i=0; i<4; i++) {
+        colors.push(color);
+        let norm = computeNormal(v_bfr, v_bbr, v_tbr);
+        normals.push(norm);
+    }
+    texCoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+    indices.push(startIndex + currentIdx + 0, startIndex + currentIdx + 1, startIndex + currentIdx + 2);
+    indices.push(startIndex + currentIdx + 0, startIndex + currentIdx + 2, startIndex + currentIdx + 3);
+    currentIdx += 4;
+    
+    // BACK BEVEL (trapezoid)
+    vertices.push(v_bbr, v_bbl, v_tbl, v_tbr);
+    for(let i=0; i<4; i++) {
+        colors.push(backColor);
+        let norm = computeNormal(v_bbr, v_bbl, v_tbl);
+        normals.push(norm);
+    }
+    texCoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+    indices.push(startIndex + currentIdx + 0, startIndex + currentIdx + 1, startIndex + currentIdx + 2);
+    indices.push(startIndex + currentIdx + 0, startIndex + currentIdx + 2, startIndex + currentIdx + 3);
+    currentIdx += 4;
+    
+    // LEFT BEVEL (trapezoid)
+    vertices.push(v_bbl, v_bfl, v_tfl, v_tbl);
+    for(let i=0; i<4; i++) {
+        colors.push(color);
+        let norm = computeNormal(v_bbl, v_bfl, v_tfl);
+        normals.push(norm);
+    }
+    texCoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+    indices.push(startIndex + currentIdx + 0, startIndex + currentIdx + 1, startIndex + currentIdx + 2);
+    indices.push(startIndex + currentIdx + 0, startIndex + currentIdx + 2, startIndex + currentIdx + 3);
+    currentIdx += 4;
+    
+    // BOTTOM FACE
+    vertices.push(v_bbl, v_bbr, v_bfr, v_bfl);
+    for(let i=0; i<4; i++) {
+        colors.push(color);
+        normals.push(vec3(0, -1, 0));
+    }
+    texCoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+    indices.push(startIndex + currentIdx + 0, startIndex + currentIdx + 1, startIndex + currentIdx + 2);
+    indices.push(startIndex + currentIdx + 0, startIndex + currentIdx + 2, startIndex + currentIdx + 3);
 }
 
 function addPopUpMechanism(x, y, z, width, depth, height, angle, hingeZ, bodyColor, panelColor, holeColor) {
@@ -305,24 +502,67 @@ function addPopUpMechanism(x, y, z, width, depth, height, angle, hingeZ, bodyCol
     const w2 = width / 2;
     const d2 = depth / 2;
 
-    localVertices.push(
-        vec4(-w2, 0, -d2, 1.0), vec4( w2, 0, -d2, 1.0),
-        vec4( w2, 0,  d2, 1.0), vec4(-w2, 0,  d2, 1.0),
-        vec4(-w2, height, d2, 1.0), vec4( w2, height, d2, 1.0)
-    );
+    const localTexCoords = [];
     
-    for(let i=0; i<6; i++) {
+    // Define base vertices positions
+    const v_bbl = vec4(-w2, 0, -d2, 1.0);      // bottom-back-left
+    const v_bbr = vec4( w2, 0, -d2, 1.0);      // bottom-back-right
+    const v_bfr = vec4( w2, 0,  d2, 1.0);      // bottom-front-right
+    const v_bfl = vec4(-w2, 0,  d2, 1.0);      // bottom-front-left
+    const v_tfl = vec4(-w2, height, d2, 1.0);  // top-front-left
+    const v_tfr = vec4( w2, height, d2, 1.0);  // top-front-right
+    
+    // BOTTOM FACE (lantai bagian bawah) - 4 vertices
+    localVertices.push(v_bbl, v_bbr, v_bfr, v_bfl);
+    for(let i=0; i<4; i++) {
         localColors.push(bodyColor);
-        localNormals.push(vec3(0, 1, 0));
+        localNormals.push(vec3(0, -1, 0));
     }
-
-    localIndices.push(
-        0, 1, 2,   0, 2, 3,
-        3, 2, 5,   3, 5, 4,
-        0, 4, 5,   0, 5, 1,
-        0, 3, 4,   1, 5, 2
-    );
-    currentVertex += 6;
+    localTexCoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+    localIndices.push(0, 1, 2,  0, 2, 3);
+    currentVertex += 4;
+    
+    // FRONT SLANTED FACE (miring depan) - 4 vertices  
+    localVertices.push(v_bfl, v_bfr, v_tfr, v_tfl);
+    for(let i=0; i<4; i++) {
+        localColors.push(bodyColor);
+        // Calculate proper normal for slanted face
+        let norm = computeNormal(v_bfl, v_bfr, v_tfr);
+        localNormals.push(norm);
+    }
+    localTexCoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+    localIndices.push(4, 5, 6,  4, 6, 7);
+    currentVertex += 4;
+    
+    // LEFT FACE (sisi kiri - segitiga) - 3 vertices
+    localVertices.push(v_bbl, v_bfl, v_tfl);
+    for(let i=0; i<3; i++) {
+        localColors.push(bodyColor);
+        localNormals.push(vec3(-1, 0, 0));
+    }
+    localTexCoords.push(vec2(0, 0), vec2(1, 0), vec2(0.5, 1));
+    localIndices.push(8, 9, 10);
+    currentVertex += 3;
+    
+    // RIGHT FACE (sisi kanan - segitiga) - 3 vertices
+    localVertices.push(v_bbr, v_tfr, v_bfr);
+    for(let i=0; i<3; i++) {
+        localColors.push(bodyColor);
+        localNormals.push(vec3(1, 0, 0));
+    }
+    localTexCoords.push(vec2(0, 0), vec2(0.5, 1), vec2(1, 0));
+    localIndices.push(11, 12, 13);
+    currentVertex += 3;
+    
+    // BACK FACE (belakang - segitiga kecil) - 4 vertices (trapezoid)
+    localVertices.push(v_bbl, v_bbr, v_tfr, v_tfl);
+    for(let i=0; i<4; i++) {
+        localColors.push(bodyColor);
+        localNormals.push(vec3(0, 0, -1));
+    }
+    localTexCoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+    localIndices.push(14, 15, 16,  14, 16, 17);
+    currentVertex += 4;
 
     const backPanelColor = [
         Math.min(1.0, bodyColor[0] + 0.3), 
@@ -338,24 +578,37 @@ function addPopUpMechanism(x, y, z, width, depth, height, angle, hingeZ, bodyCol
     const backZOffset = d2 + 0.0001;
     const panelThickness = 0.05;
     
+    // Back panel - front face (facing forward)
     localVertices.push(
-        vec4(-panelW2, 0, backZOffset, 1.0),
-        vec4( panelW2, 0, backZOffset, 1.0),
-        vec4( panelW2, panelHeight, backZOffset, 1.0),
-        vec4(-panelW2, panelHeight, backZOffset, 1.0)
+        vec4(-panelW2, 0, backZOffset, 1.0),                    // 0: bottom-left
+        vec4( panelW2, 0, backZOffset, 1.0),                    // 1: bottom-right
+        vec4( panelW2, panelHeight, backZOffset, 1.0),          // 2: top-right
+        vec4(-panelW2, panelHeight, backZOffset, 1.0)           // 3: top-left
     );
     
-    localVertices.push(
-        vec4(-panelW2, 0, backZOffset + panelThickness, 1.0),
-        vec4( panelW2, 0, backZOffset + panelThickness, 1.0),
-        vec4( panelW2, panelHeight, backZOffset + panelThickness, 1.0),
-        vec4(-panelW2, panelHeight, backZOffset + panelThickness, 1.0)
-    );
-    
-    for(let i = 0; i < 8; i++) {
+    for(let i = 0; i < 4; i++) {
         localColors.push(backPanelColor);
-        localNormals.push(vec3(0, 0, -1));
+        localNormals.push(vec3(0, 0, 1));  // Front face normal
     }
+    
+    // Texture coords for front face
+    localTexCoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+    
+    // Back panel - back face (facing backward)
+    localVertices.push(
+        vec4(-panelW2, 0, backZOffset + panelThickness, 1.0),           // 4: bottom-left
+        vec4( panelW2, 0, backZOffset + panelThickness, 1.0),           // 5: bottom-right
+        vec4( panelW2, panelHeight, backZOffset + panelThickness, 1.0), // 6: top-right
+        vec4(-panelW2, panelHeight, backZOffset + panelThickness, 1.0)  // 7: top-left
+    );
+    
+    for(let i = 0; i < 4; i++) {
+        localColors.push(backPanelColor);
+        localNormals.push(vec3(0, 0, -1));  // Back face normal
+    }
+    
+    // Texture coords for back face
+    localTexCoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
     
     const backStart = currentVertex;
     localIndices.push(
@@ -386,6 +639,7 @@ function addPopUpMechanism(x, y, z, width, depth, height, angle, hingeZ, bodyCol
     normal = normalize(normal);
     const offsetVec = scale(panelOffset, vec4(normal[0], normal[1], normal[2], 0));
 
+    // Socket panel (white panel with holes)
     localVertices.push(
         add(p_bl, offsetVec), add(p_tl, offsetVec),
         add(p_tr, offsetVec), add(p_br, offsetVec)
@@ -395,6 +649,9 @@ function addPopUpMechanism(x, y, z, width, depth, height, angle, hingeZ, bodyCol
         localColors.push(panelColor);
         localNormals.push(normal);
     }
+    
+    // Texture coordinates for socket panel - proper UV mapping
+    localTexCoords.push(vec2(0, 0), vec2(0, 1), vec2(1, 1), vec2(1, 0));
     
     localIndices.push(
         currentVertex, currentVertex + 1, currentVertex + 2,
@@ -432,6 +689,7 @@ function addPopUpMechanism(x, y, z, width, depth, height, angle, hingeZ, bodyCol
         localVertices.push(center);
         localColors.push(holeColor);
         localNormals.push(normal);
+        localTexCoords.push(vec2(0.5, 0.5));
         currentVertex++;
         
         for (let i = 0; i <= holeSegments; i++) {
@@ -441,6 +699,7 @@ function addPopUpMechanism(x, y, z, width, depth, height, angle, hingeZ, bodyCol
             localVertices.push(add(add(center, x_comp), y_comp));
             localColors.push(holeColor);
             localNormals.push(normal);
+            localTexCoords.push(vec2(0.5 + 0.5 * Math.cos(angle), 0.5 + 0.5 * Math.sin(angle)));
         }
         
         for (let i = 0; i < holeSegments; i++) {
@@ -473,6 +732,7 @@ function addPopUpMechanism(x, y, z, width, depth, height, angle, hingeZ, bodyCol
         vertices.push(v);
         colors.push(localColors[i]);
         normals.push(n);
+        texCoords.push(localTexCoords[i]);
     }
     
     for(let i=0; i<localIndices.length; i++) {
@@ -493,6 +753,10 @@ function addTriangle(x, y, z, width, height, color) {
         normals.push(vec3(0, 1, 0));
     }
     
+    texCoords.push(vec2(0.5, 0.0));
+    texCoords.push(vec2(1.0, 1.0));
+    texCoords.push(vec2(0.0, 1.0));
+    
     indices.push(startIndex, startIndex+1, startIndex+2);
 }
 
@@ -505,6 +769,8 @@ function createGrid() {
     var gridColors = [];
     var gridNormals = [];
     
+    var gridTexCoords = [];
+    
     for (var i = -gridSize; i <= gridSize; i++) {
         var z_pos = i * gridStep;
         gridVertices.push(vec4(-gridSize * gridStep, 0, z_pos, 1.0));
@@ -513,6 +779,8 @@ function createGrid() {
         gridColors.push(gridColor);
         gridNormals.push(vec3(0, 1, 0));
         gridNormals.push(vec3(0, 1, 0));
+        gridTexCoords.push(vec2(0, 0));
+        gridTexCoords.push(vec2(1, 0));
     }
     
     for (var i = -gridSize; i <= gridSize; i++) {
@@ -523,11 +791,14 @@ function createGrid() {
         gridColors.push(gridColor);
         gridNormals.push(vec3(0, 1, 0));
         gridNormals.push(vec3(0, 1, 0));
+        gridTexCoords.push(vec2(0, 0));
+        gridTexCoords.push(vec2(0, 1));
     }
 
     vertices.push(...gridVertices);
     colors.push(...gridColors);
     normals.push(...gridNormals);
+    texCoords.push(...gridTexCoords);
 }
 
 function addBox(x, y, z, width, height, depth, color) {
@@ -549,10 +820,16 @@ function addBox(x, y, z, width, height, depth, color) {
         vec3(0, 0, -1), vec3(0, 0, -1), vec3(0, 0, -1), vec3(0, 0, -1)
     ];
     
+    const boxTexCoords = [
+        vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1),
+        vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1)
+    ];
+    
     for (var i = 0; i < boxVertices.length; i++) {
         vertices.push(boxVertices[i]);
         colors.push(color);
         normals.push(boxNormals[i]);
+        texCoords.push(boxTexCoords[i]);
     }
     
     const faces = [
@@ -597,6 +874,15 @@ function setupBuffers() {
     gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vNormal);
     
+    if (tBuffer) gl.deleteBuffer(tBuffer);
+    tBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, tBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
+    
+    var vTexCoord = gl.getAttribLocation(program, "vTexCoord");
+    gl.vertexAttribPointer(vTexCoord, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vTexCoord);
+    
     if (iBuffer) gl.deleteBuffer(iBuffer);
     iBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, iBuffer);
@@ -615,6 +901,9 @@ function updateBuffers() {
     
     gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(normals), gl.STATIC_DRAW);
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, tBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
     
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, iBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
@@ -862,6 +1151,15 @@ function render() {
     gl.uniform3fv(lightPositionLoc, flatten(lightPosEye));
     gl.uniform1f(shininessLoc, shininess);
     gl.uniform1i(enableLightingLoc, lightingEnabled ? 1 : 0);
+    
+    // Set texture uniforms
+    gl.activeTexture(gl.TEXTURE0);
+    if (textureMode > 0 && currentTexture) {
+        gl.bindTexture(gl.TEXTURE_2D, currentTexture);
+    }
+    gl.uniform1i(textureLoc, 0);
+    gl.uniform1i(textureModeLoc, textureMode);
+    gl.uniform1i(useTextureLoc, useTexture ? 1 : 0);
     
     const objectIndexCount = indices.length;
     let gridVertexCount = 0;
