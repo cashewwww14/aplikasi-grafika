@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Folding Doors - 4 Panel System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+            border-bottom: 3px solid rgba(255,255,255,0.2);
+        }
+
+        .header h1 {
+            font-size: 2em;
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1em;
+            opacity: 0.95;
+            font-weight: 300;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 200px 1fr 320px;
+            gap: 20px;
+            padding: 20px;
+            min-height: 500px;
+        }
+
+        .texture-preview-left {
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .texture-preview-left h4 {
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 12px;
+            text-align: center;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .texture-preview-left img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+        }
+
+        .canvas-container {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        canvas {
+            border: 3px solid #1e3a8a;
+            border-radius: 12px;
+            box-shadow: 0 10px 35px rgba(0,0,0,0.3);
+            cursor: grab;
+            background: #c8d0d8;
+        }
+
+        canvas:active {
+            cursor: grabbing;
+        }
+
+        .controls-panel {
+            background: #f1f5f9;
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 500px;
+        }
+
+        .control-section {
+            background: white;
+            padding: 18px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+
+        .control-section:hover {
+            box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+            transform: translateY(-1px);
+        }
+
+        .control-section h3 {
+            margin: 0 0 15px 0;
+            color: #1e3a8a;
+            font-size: 1.1em;
+            font-weight: 700;
+            border-bottom: 2px solid #7c3aed;
+            padding-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-group {
+            margin-bottom: 18px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #1e293b;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8fafc;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 6px;
+            border-radius: 6px;
+            background: linear-gradient(to right, #1e3a8a 0%, #7c3aed 100%);
+            outline: none;
+            -webkit-appearance: none;
+            position: relative;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            border: 2px solid #1e3a8a;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: #7c3aed;
+            transform: scale(1.1);
+            border-color: #7c3aed;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            border: 2px solid #1e3a8a;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+
+        input[type="range"]::-moz-range-thumb:hover {
+            background: #7c3aed;
+            transform: scale(1.1);
+            border-color: #7c3aed;
+        }
+
+        .value-display {
+            min-width: 45px;
+            text-align: center;
+            color: #1e3a8a;
+            font-weight: 700;
+            font-size: 0.95em;
+            background: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+            box-shadow: 0 3px 15px rgba(30, 58, 138, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(30, 58, 138, 0.5);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.active {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 3px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+        }
+
+        .info-text {
+            background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+            font-size: 0.85em;
+            color: #1e40af;
+            border-left: 4px solid #7c3aed;
+            font-weight: 500;
+            line-height: 1.5;
+        }
+
+        input[type="color"] {
+            width: 50px;
+            height: 35px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        input[type="color"]:hover {
+            border-color: #7c3aed;
+            transform: scale(1.05);
+        }
+            border: 2px solid #ddd;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .info-text {
+            background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+            padding: 16px;
+            border-radius: 12px;
+            margin-top: 15px;
+            font-size: 0.95em;
+            color: #1e40af;
+            border-left: 5px solid #7c3aed;
+            font-weight: 500;
+            line-height: 1.6;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        select:hover {
+            border-color: #667eea;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        input[type="color"] {
+            width: 70px;
+            height: 50px;
+            border: 3px solid #e2e8f0;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        input[type="color"]:hover {
+            border-color: #7c3aed;
+            transform: scale(1.05);
+        }
+
+        @media (max-width: 1600px) {
+            .main-content {
+                grid-template-columns: 1fr 350px;
+            }
+            
+            .texture-preview-left {
+                display: none;
+            }
+            
+            .controls-panel {
+                max-height: none;
+            }
+            
+            .header h1 {
+                font-size: 2.5em;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Folding Doors System</h1>
+            <p>Hierarchical 4-Panel Door with Hinges & Details</p>
+        </div>
+
+        <div class="main-content">
+            <div class="texture-preview-left">
+                <h4>Door Texture</h4>
+                <img src="door-texture.jpg" alt="Door Texture" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%238B5A2B%22 width=%22200%22 height=%22300%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2216%22%3ENo Texture%3C/text%3E%3C/svg%3E'">
+            </div>
+            
+            <div class="canvas-wrapper">
+                <canvas id="gl-canvas" width="900" height="700"></canvas>
+            </div>
+
+            <div class="controls-panel">
+                <!-- Door Animation Controls -->
+                <div class="control-section">
+                    <h3>Panel Controls</h3>
+                    
+                    <div class="control-group">
+                        <label>Panel 1 Angle (Leftmost)</label>
+                        <div class="slider-container">
+                            <input type="range" id="panel1Angle" min="-170" max="170" value="0" step="1">
+                            <span class="value-display" id="panel1Angle-value">0°</span>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Panel 2 Angle</label>
+                        <div class="slider-container">
+                            <input type="range" id="panel2Angle" min="-170" max="170" value="0" step="1">
+                            <span class="value-display" id="panel2Angle-value">0°</span>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Panel 3 Angle</label>
+                        <div class="slider-container">
+                            <input type="range" id="panel3Angle" min="-170" max="170" value="0" step="1">
+                            <span class="value-display" id="panel3Angle-value">0°</span>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Panel 4 Angle (Rightmost)</label>
+                        <div class="slider-container">
+                            <input type="range" id="panel4Angle" min="-170" max="170" value="0" step="1">
+                            <span class="value-display" id="panel4Angle-value">0°</span>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="openBtn" onclick="openDoors()">Open Doors</button>
+                        <button id="closeBtn" onclick="closeDoors()">Close Doors</button>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button id="foldBtn" onclick="foldDoors()">Fold Doors</button>
+                    </div>
+
+                    <div class="info-text">
+                        <strong>Hierarchical System</strong><br>
+                                                Panels connected with gaps. Each has 2 legs (left/right edges) and 2 hinges!
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>Camera Controls</h3>
+                    
+                    <div class="control-group">
+                        <label>Zoom</label>
+                        <div class="slider-container">
+                            <input type="range" id="zoomSlider" min="3" max="15" value="8" step="0.1">
+                            <span class="value-display" id="zoom-value">8.0</span>
+                        </div>
+                    </div>
+
+                    <div class="info-text">
+                        <strong>Mouse Control</strong><br>
+                        Drag to rotate � Scroll to zoom
+                    </div>
+                </div>
+
+                <!-- Lighting Controls -->
+                <div class="control-section">
+                    <h3>Lighting</h3>
+                    
+                    <div class="control-group">
+                        <label>Ambient Light</label>
+                        <input type="color" id="ambientColor" value="#333333">
+                    </div>
+
+                    <div class="control-group">
+                        <label>Diffuse Light</label>
+                        <input type="color" id="diffuseColor" value="#ffffff">
+                    </div>
+
+                    <div class="control-group">
+                        <label>Specular Light</label>
+                        <input type="color" id="specularColor" value="#ffffff">
+                    </div>
+
+                    <div class="control-group">
+                        <label>Shininess</label>
+                        <div class="slider-container">
+                            <input type="range" id="shininess" min="1" max="200" value="50" step="1">
+                            <span class="value-display" id="shininess-value">50</span>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Light Position X</label>
+                        <div class="slider-container">
+                            <input type="range" id="lightX" min="-10" max="10" value="3" step="0.1">
+                            <span class="value-display" id="lightX-value">3.0</span>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Light Position Y</label>
+                        <div class="slider-container">
+                            <input type="range" id="lightY" min="-10" max="10" value="5" step="0.1">
+                            <span class="value-display" id="lightY-value">5.0</span>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Light Position Z</label>
+                        <div class="slider-container">
+                            <input type="range" id="lightZ" min="-10" max="10" value="3" step="0.1">
+                            <span class="value-display" id="lightZ-value">3.0</span>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="toggleLighting" class="active" onclick="toggleLighting()">Lighting: ON</button>
+                        <button class="secondary" onclick="resetLighting()">Reset</button>
+                    </div>
+                </div>
+
+                <!-- View Options -->
+                <div class="control-section">
+                    <h3>View Options</h3>
+                    
+                    <div class="button-group">
+                        <button id="toggleTextureBtn" class="active" onclick="toggleTexture()">Texture: ON</button>
+                        <button id="toggleLighting" class="active" onclick="toggleLighting()">Lighting: ON</button>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button id="wireframeBtn" onclick="toggleWireframe()">Wireframe: OFF</button>
+                        <button class="secondary" onclick="resetView()">Reset View</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vertex Shader -->
+    <script id="vertex-shader" type="x-shader/x-vertex">
+        attribute vec4 vPosition;
+        attribute vec4 vColor;
+        attribute vec3 vNormal;
+        attribute vec2 vTexCoord;
+        
+        uniform mat4 modelViewMatrix;
+        uniform mat4 projectionMatrix;
+        uniform mat3 normalMatrix;
+        
+        varying vec4 fColor;
+        varying vec3 fNormal;
+        varying vec3 fPosition;
+        varying vec2 fTexCoord;
+        
+        void main() {
+            // Transform position to eye coordinates
+            vec4 eyePosition = modelViewMatrix * vPosition;
+            fPosition = eyePosition.xyz;
+            
+            // Transform normal to eye coordinates
+            fNormal = normalize(normalMatrix * vNormal);
+            
+            // Pass color and texture coordinates to fragment shader
+            fColor = vColor;
+            fTexCoord = vTexCoord;
+            
+            gl_Position = projectionMatrix * eyePosition;
+        }
+    </script>
+
+    <!-- Fragment Shader -->
+    <script id="fragment-shader" type="x-shader/x-fragment">
+        precision mediump float;
+        
+        varying vec4 fColor;
+        varying vec3 fNormal;
+        varying vec3 fPosition;
+        varying vec2 fTexCoord;
+        
+        uniform vec3 ambientLight;
+        uniform vec3 diffuseLight;
+        uniform vec3 specularLight;
+        uniform vec3 lightPosition;
+        uniform float shininess;
+        uniform int enableLighting;
+        
+        uniform sampler2D uTexture;
+        uniform int useTexture;
+        
+        void main() {
+            vec4 finalColor = fColor;
+            
+            // Apply texture if enabled
+            if (useTexture == 1) {
+                vec4 texColor = texture2D(uTexture, fTexCoord);
+                finalColor = texColor * fColor;
+            }
+            
+            if (enableLighting == 1) {
+                // Normalize the interpolated normal
+                vec3 N = normalize(fNormal);
+                
+                // Calculate light direction
+                vec3 L = normalize(lightPosition - fPosition);
+                
+                // Calculate view direction (towards camera at origin in eye space)
+                vec3 V = normalize(-fPosition);
+                
+                // Calculate reflection vector
+                vec3 R = reflect(-L, N);
+                
+                // Ambient component
+                vec3 ambient = ambientLight * finalColor.rgb;
+                
+                // Diffuse component
+                float diffuseFactor = max(dot(N, L), 0.0);
+                vec3 diffuse = diffuseFactor * diffuseLight * finalColor.rgb;
+                
+                // Specular component
+                float specularFactor = 0.0;
+                if (diffuseFactor > 0.0) {
+                    specularFactor = pow(max(dot(R, V), 0.0), shininess);
+                }
+                vec3 specular = specularFactor * specularLight;
+                
+                // Combine all components
+                vec3 litColor = ambient + diffuse + specular;
+                gl_FragColor = vec4(litColor, finalColor.a);
+            } else {
+                gl_FragColor = finalColor;
+            }
+        }
+    </script>
+
+    <script type="text/javascript" src="webgl-utils.js"></script>
+    <script type="text/javascript" src="MVnew.js"></script>
+    <script type="text/javascript" src="initShaders.js"></script>
+    <script type="text/javascript" src="folding-doors.js"></script>
+</body>
+</html>
+
